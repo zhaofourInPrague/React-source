@@ -17,7 +17,7 @@ function mount(vdom, parentDOM) {
 /**
  * 把虚拟DOM转成真实DOM
  */
-function createDOM(vdom) {
+export function createDOM(vdom) {
     if (!vdom) return null;
     let { type, props } = vdom;
     let dom;//真实DOM
@@ -44,13 +44,15 @@ function createDOM(vdom) {
             }
         }
     }
+    vdom.dom = dom;
     return dom;
 }
 function mountClassComponent(vdom) {
     let { type: ClassComponent, props } = vdom;
     let classInstance = new ClassComponent(props);
     let renderVdom = classInstance.render();
-    vdom.oldRenderVdom = renderVdom;
+    // 这样类组件实例的oldRenderVdom上就可以挂有真实dom了,由createDOM可见
+    classInstance.oldRenderVdom = vdom.oldRenderVdom = renderVdom;
     return createDOM(renderVdom);
 }
 function mountFunctionComponent(vdom) {
@@ -72,6 +74,8 @@ function updateProps(dom, oldProps, newProps) {
     for (let key in newProps) {
         if (key === 'children') {//children
             continue;//此处忽略子节点的处理
+        } else if(key.startsWith('on')) {
+            dom[key.toLocaleLowerCase()] = newProps[key];
         } else if (key === 'style') {//style
             let styleObj = newProps[key];
             for (let attr in styleObj) {
@@ -82,6 +86,26 @@ function updateProps(dom, oldProps, newProps) {
         }
     }
 }
+
+export function findDOM(vdom) {
+    if(!vdom) {
+        return null;
+    }
+    if(vdom.dom) {
+        return vdom.dom;
+    } else {
+        // 呼应了mountClassComponent中的注释，这个是为类组件服务
+        return findDOM(vdom.oldRenderVdom);
+    }
+}
+
+export function compareTwoVdom(parentDOM, oldVdom, newVdom) {
+    const oldDOM = findDOM(oldVdom);
+    const newDOM = createDOM(newVdom);
+    parentDOM.replaceChild(newDOM, oldDOM);
+}
+
+
 const ReactDOM = {
     render
 }
